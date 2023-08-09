@@ -1,0 +1,15 @@
+{
+  "name": "canvas.back",
+  "version": "1.0.0",
+  "description": "Back websocket for syncing canvas",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Nicolas Cardenas",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2"
+  }
+}
