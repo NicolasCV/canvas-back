@@ -1,11 +1,17 @@
 const express = require("express");
-const fs = require("fs");
 const http = require("http");
-const WebSocket = require("ws");
+const socketIo = require("socket.io");
+const fs = require("fs");
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const io = socketIo(server, {
+  cors: { origin: "*" },
+});
+
+io.on("connect_error", (err) => {
+  console.log(`connect_error due to ${err.message}`);
+});
 
 const canvasDataFilePath = "canvas-data.json";
 
@@ -18,6 +24,7 @@ function loadCanvasData() {
     return [];
   }
 }
+
 function saveCanvasData(data) {
   try {
     fs.writeFileSync(canvasDataFilePath, JSON.stringify(data), "utf8");
@@ -28,32 +35,26 @@ function saveCanvasData(data) {
 
 let canvasData = loadCanvasData();
 
-wss.on("connection", (socket) => {
+io.on("connection", (socket) => {
   console.log("Client connected");
-  // Send existing canvas data to the new client
-  socket.send(canvasData);
+
+  socket.emit("canvasData", canvasData);
 
   socket.on("message", (data) => {
-    console.log("Received:", data);
-    console.log("ye");
-    console.log(data);
+    console.log("Message received:", data);
     canvasData = data;
     saveCanvasData(canvasData);
 
-    wss.clients.forEach((client) => {
-      if (client !== socket && client.readyState === WebSocket.OPEN) {
-        client.send(canvasData);
-      }
-    });
+    io.emit("canvasData", canvasData);
   });
 
-  socket.on("close", () => {
+  socket.on("disconnect", () => {
     console.log("Client disconnected");
   });
 });
 
-wss.on("error", (error) => {
-  console.error("WebSocket error:", error);
+io.on("error", (error) => {
+  console.error("Socket.io error:", error);
 });
 
 server.listen(3000, () => {
