@@ -1,15 +1,17 @@
 const express = require("express");
 const http = require("http");
-const socketIo = require("socket.io");
+const WebSocket = require("ws");
 const fs = require("fs");
+const cors = require("cors");
 
 const app = express();
-const server = http.createServer(app);
-const io = socketIo(server, {
-  cors: { origin: "*" },
-});
+app.use(cors({ origin: "*" }));
 
-io.on("connect_error", (err) => {
+const server = http.createServer(app);
+
+const wss = new WebSocket.Server({ server });
+
+wss.on("connect_error", (err) => {
   console.log(`connect_error due to ${err.message}`);
 });
 
@@ -27,25 +29,31 @@ function loadCanvasData() {
 
 function saveCanvasData(data) {
   try {
-    fs.writeFileSync(canvasDataFilePath, JSON.stringify(data), "utf8");
+    fs.writeFileSync(canvasDataFilePath, data, "utf8");
   } catch (error) {
     console.error("Error saving canvas data:", error.message);
   }
 }
 
-let canvasData = loadCanvasData();
-
-io.on("connection", (socket) => {
+wss.on("connection", (socket, req) => {
   console.log("Client connected");
+  socket.send(JSON.stringify(loadCanvasData()));
 
-  socket.emit("canvasData", canvasData);
+  socket.on("message", (message) => {
+    let messageString;
+    if (typeof message === "string") {
+      messageString = message;
+    } else if (message instanceof Buffer) {
+      messageString = message.toString("utf8");
+    }
 
-  socket.on("message", (data) => {
-    console.log("Message received:", data);
-    canvasData = data;
-    saveCanvasData(canvasData);
+    saveCanvasData(messageString);
 
-    io.emit("canvasData", canvasData);
+    wss.clients.forEach((client) => {
+      if (client !== socket && client.readyState === WebSocket.OPEN) {
+        client.send(messageString);
+      }
+    });
   });
 
   socket.on("disconnect", () => {
@@ -53,8 +61,8 @@ io.on("connection", (socket) => {
   });
 });
 
-io.on("error", (error) => {
-  console.error("Socket.io error:", error);
+wss.on("error", (error) => {
+  console.error("Errorsino:", error);
 });
 
 server.listen(3000, () => {
