@@ -3,6 +3,7 @@ const http = require("http");
 const WebSocket = require("ws");
 const fs = require("fs");
 const cors = require("cors");
+const { MongoClient } = require("mongodb");
 
 const app = express();
 app.use(cors({ origin: "*" }));
@@ -27,9 +28,42 @@ function loadCanvasData() {
   }
 }
 
-function saveCanvasData(data) {
+const mongoURI =
+  "mongodb+srv://ad:passpass123@spiralcluster.q6k2weq.mongodb.net/?retryWrites=true&w=majority";
+
+const dbName = "Canvas";
+const collectionName = "Data";
+
+async function saveCanvasDataToMongo(data) {
+  try {
+    const client = new MongoClient(mongoURI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    await client.connect();
+
+    const db = client.db(dbName);
+    const collection = db.collection(collectionName);
+
+    // Add a "created_at" timestamp
+    const now = new Date();
+    const document = { data, created_at: now };
+
+    await collection.insertOne(document);
+
+    console.log("Canvas data saved to MongoDB.");
+
+    client.close();
+  } catch (error) {
+    console.error("Error saving canvas data to MongoDB:", error.message);
+  }
+}
+
+async function saveCanvasData(data) {
   try {
     fs.writeFileSync(canvasDataFilePath, data, "utf8");
+
+    await saveCanvasDataToMongo(data);
   } catch (error) {
     console.error("Error saving canvas data:", error.message);
   }
@@ -65,6 +99,13 @@ wss.on("error", (error) => {
   console.error("Errorsino:", error);
 });
 
-server.listen(3000, () => {
-  console.log("Server is listening on port 3000");
+const canvasLink = "https://canvas-app-gules.vercel.app/";
+
+app.get("/", (req, res) => {
+  res.redirect(canvasLink);
+});
+
+const port = 8080;
+server.listen(port, () => {
+  console.log(`Server is listening on port ${port}`);
 });
